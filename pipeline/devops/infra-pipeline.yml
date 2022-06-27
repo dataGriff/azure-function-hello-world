@@ -1,0 +1,80 @@
+trigger:
+- master
+ 
+pool:
+  vmImage: ubuntu-latest
+ 
+variables:
+  azureServiceConnection: 'DevOps - Deploy'
+  resourceGroupName: 'dv-helloworld-rg'
+  functionAppName: 'dv-helloworld-azfn-eun-dgrf'
+  location: 'NorthEurope'
+  templateFile: 'infra/main.bicep'
+ 
+steps:
+# - task: AzureCLI@2
+#   displayName: 'Validate template'
+#   inputs:
+#     azureSubscription: $(azureServiceConnection)
+#     scriptType: 'bash'
+#     scriptLocation: 'inlineScript'
+#     inlineScript: az deployment sub validate --template-file $(templateFile) --location $(location) 
+ 
+# - task: AzureCLI@2
+#   displayName: 'Deploy Azure Functions'
+#   inputs:
+#     azureSubscription: $(azureServiceConnection)
+#     scriptType: 'bash'
+#     scriptLocation: 'inlineScript'
+#     inlineScript: az deployment sub create --template-file $(templateFile) --location $(location) 
+
+- task: DotNetCoreCLI@2
+  displayName: Build
+  inputs:
+    command: 'build'
+    projects: |
+      $(System.DefaultWorkingDirectory)/api/*.csproj
+    arguments: --output $(System.DefaultWorkingDirectory)/publish_output --configuration Release
+
+- task: ArchiveFiles@2
+  displayName: 'Archive files'
+  inputs:
+    rootFolderOrFile: '$(System.DefaultWorkingDirectory)/publish_output'
+    includeRootFolder: false
+    archiveType: zip
+    archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+    replaceExistingArchive: true
+
+- publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+  artifact: drop
+
+- powershell: |
+    tree "$(System.ArtifactsDirectory)" /F
+    tree "$(Pipeline.Workspace)" /F
+  displayName: "Debug: Show directory tree"
+
+- task: AzureFunctionApp@1
+  displayName: 'Azure functions app deploy'
+  inputs:
+    azureSubscription: $(azureServiceConnection)
+    appType: functionApp
+    appName: $(functionAppName)
+    package: '$(System.ArtifactsDirectory)/$(Build.BuildId).zip'
+
+
+
+# - task: ArchiveFiles@2
+#   inputs:
+#     rootFolderOrFile: '$(System.DefaultWorkingDirectory)/Functions'
+#     includeRootFolder: false
+#     archiveType: 'zip'
+#     archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+#     replaceExistingArchive: true
+
+# - task: AzureFunctionApp@1
+#   inputs:
+#     azureSubscription: $(azureServiceConnection)
+#     appType: 'functionApp'
+#     appName: 'CloudninjaBicepFunctionApp'
+#     package: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+#     deploymentMethod: 'auto'

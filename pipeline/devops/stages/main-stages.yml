@@ -1,0 +1,32 @@
+parameters:
+- name: parametersDirectory
+  type: string
+- name: templates
+  type: object
+- name: environments
+  type: object
+
+stages:
+  - stage: ci 
+    jobs:
+    - template: jobs/ci-jobs.yml
+      parameters:
+        parametersDirectory: ${{ parameters.parametersDirectory }}
+        templates: ${{ parameters.templates }}
+
+  - ${{ each environment in parameters.environments }}:
+    - stage: ${{ environment.environmentName }}
+      jobs:
+      - ${{ each template in parameters.templates }}:
+        - template: jobs/cd-jobs.yml
+          parameters:
+            templateFile: ${{ template.fileName }}
+            parametersFile: ${{ environment.parametersFile }}
+            azureServiceConnection: ${{ environment.azureServiceConnection }}
+            resourceGroupName: ${{ environment.resourceGroupName }}
+            resourceGroupLocation: ${{ environment.resourceGroupLocation }}
+
+
+
+
+  
